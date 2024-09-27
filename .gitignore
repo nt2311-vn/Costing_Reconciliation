@@ -4,3 +4,6 @@
 
 # Ignore zig-out (generate in build process)
 /zig-out
+
+# Ignore zig-cache
+/zig-cache
