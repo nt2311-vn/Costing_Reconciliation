@@ -7,7 +7,7 @@ const ascii = std.ascii;
 const CliCommand = struct {
     name: []const u8,
     description: []const u8,
-    callbackFn: *const fn () anyerror!void,
+    callbackFn: *const fn (allocator: mem.Allocator) anyerror!void,
 };
 
 const trademarks =
@@ -29,13 +29,14 @@ fn cleanInput(allocator: mem.Allocator, str: []const u8) ![][]const u8 {
     return words.toOwnedSlice();
 }
 
-fn callBackHelp() !void {
-    debug.print("Help command called\n", .{});
+fn callBackHelp(allocator: mem.Allocator) !void {
+    _ = allocator;
 }
 
 fn getCommands(allocator: mem.Allocator) !std.StringHashMap(CliCommand) {
     var commands = std.StringHashMap(CliCommand).init(allocator);
-    try commands.put(try allocator.dupe(u8, "help"), .{ .name = "help", .description = "List of available comamnds in costing.", .callbackFn = callBackHelp });
+
+    try commands.put("help", .{ .name = "help", .description = "List of available commands in costing.", .callbackFn = callBackHelp });
 
     return commands;
 }
@@ -67,7 +68,7 @@ pub fn starRepl() !void {
             }
 
             if (commands.get(commandName)) |command| {
-                command.callbackFn() catch |err| {
+                command.callbackFn(allocator) catch |err| {
                     debug.print("Error: {}\n", .{err});
                 };
             } else {
