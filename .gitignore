@@ -1,0 +1,6 @@
+
+# Ignore .env
+.env
+
+# Ignore zig-out (generate in build process)
+/zig-out
