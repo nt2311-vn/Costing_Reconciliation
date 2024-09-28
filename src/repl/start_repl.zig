@@ -22,11 +22,11 @@ fn cleanInput(allocator: mem.Allocator, str: []const u8) ![][]const u8 {
     defer allocator.free(lower);
 
     var words = std.ArrayList([]const u8).init(allocator);
-    defer words.deinit();
+    defer allocator.free(words);
 
     var iterator = mem.splitSequence(u8, lower, " ");
     while (iterator.next()) |word| {
-        if (word.len > 0) try words.append(try allocator.dupe(u8, word));
+        if (word.len > 0) try words.append(word);
     }
 
     return try words.toOwnedSlice();
@@ -36,15 +36,18 @@ fn callBackHelp(allocator: mem.Allocator) !void {
     const commands = try getCommands(allocator);
     defer allocator.free(commands);
 
-    for (commands) |command| {
-        debug.print("{s} - {s}", .{ command.name, command.description });
+    var it = commands.iterator();
+    while (it.next()) |command| {
+        debug.print("{s} - {s}", .{ command.value_ptr.name, command.value_ptr.description });
     }
     debug.print("", .{});
 }
 
-fn getCommands(allocator: mem.Allocator) mem.Allocator.Error![]CliCommand {
-    var commands = allocator.alloc(CliCommand, 1);
-    commands[0] = CliCommand{ .name = "help", .description = "List all the available commands", .callbackFn = callBackHelp };
+fn getCommands(allocator: mem.Allocator) !std.StringHashMap(CliCommand) {
+    var commands = std.StringHashMap(CliCommand).init(allocator);
+    defer commands.deinit();
+
+    try commands.put("help", .{ .name = "hellp", .description = "List all the available commands", .callbackFn = callBackHelp });
 
     return commands;
 }
@@ -63,23 +66,20 @@ pub fn starRepl() !void {
         debug.print("costing>", .{});
         if (try stdin.readUntilDelimiterOrEof(&buffer, '\n')) |input| {
             const cleaned = try cleanInput(allocator, input);
-            defer {
-                for (cleaned) |word| {
-                    allocator.free(word);
-                }
-
-                allocator.free(cleaned);
-            }
+            defer allocator.free(cleaned);
 
             if (cleaned.len == 0) continue;
-            const commandName = cleaned[0];
+            const command = cleaned[0];
+            const commands = try getCommands(allocator);
+            defer commands.deinit();
 
-            if (std.mem.indexOfScalar(comptime T: type, slice: []const T, value: T)) {}
-            
-
-            
+            if (commands.get(command)) |cli| {
+                try cli.callbackFn(allocator);
+            } else {
+                debug.print("Invalid command", .{});
+            }
         } else {
-            continue;
+            break;
         }
     }
 }
