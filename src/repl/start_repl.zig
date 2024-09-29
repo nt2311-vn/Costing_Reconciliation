@@ -29,12 +29,11 @@ fn cleanInput(allocator: mem.Allocator, str: []const u8) ![][]const u8 {
         if (word.len > 0) try words.append(word);
     }
 
-    return try words.toOwnedSlice();
+    return words.toOwnedSlice();
 }
 
 fn callBackHelp(allocator: mem.Allocator) !void {
     const commands = try getCommands(allocator);
-    defer allocator.free(commands);
 
     var it = commands.iterator();
     while (it.next()) |command| {
