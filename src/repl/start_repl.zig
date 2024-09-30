@@ -6,6 +6,7 @@ const ascii = std.ascii;
 const heap = std.heap;
 
 const CliCommand = struct {
+    allocator: mem.Allocator,
     name: []const u8,
     description: []const u8,
     callbackFn: *const fn (allocator: mem.Allocator) anyerror!void,
