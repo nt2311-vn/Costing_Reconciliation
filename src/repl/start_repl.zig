@@ -36,25 +36,23 @@ pub fn startRepl() !void {
     _ = gpa.deinit();
 
     const stdin = std.io.getStdIn().reader();
-    const stdout = std.io.getStdOut().writer();
-
     const allocator = gpa.allocator();
 
-    try stdout.print("{s}\n", .{trademarks});
+    std.debug.print("{s}\n", .{trademarks});
 
     var commands = try getCommands(allocator);
     defer commands.deinit();
     var buf: [120]u8 = undefined;
 
     while (true) {
-        try stdout.print("costing> ", .{});
+        std.debug.print("costing> ", .{});
 
         if (try stdin.readUntilDelimiterOrEof(&buf, '\n')) |word| {
             const line = mem.trimRight(u8, word[0 .. word.len - 1], "\r");
             if (commands.get(line)) |cli| {
                 try cli.callbackFn(allocator);
             } else {
-                std.debug.print("Ivalid command\n", .{});
+                std.debug.print("Invalid command\n", .{});
             }
         }
     }
