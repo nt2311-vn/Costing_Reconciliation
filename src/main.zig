@@ -2,7 +2,7 @@ const std = @import("std");
 const repl = @import("./repl/start_repl.zig");
 
 pub fn main() !void {
-    try repl.starRepl();
+    try repl.startRepl();
 }
 
 test "simple test" {
