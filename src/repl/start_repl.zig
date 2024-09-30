@@ -1,96 +1,60 @@
 const std = @import("std");
-const debug = std.debug;
-const io = std.io;
-const mem = std.mem;
-const ascii = std.ascii;
-const heap = std.heap;
+const mem = @import("std").mem;
+const heap = @import("std").heap;
 
-pub const CliCommand = struct {
-    name: []const u8,
-    description: []const u8,
-    callbackFn: *const fn () anyerror!void,
-};
-
-const trademarks =
+const trademarks: []const u8 =
     \\(c) Copyright nt2311-vn. All right reserved.
     \\Welcome to costing recoliation cli written in Zig.
     \\
 ;
 
-fn callbackHelp() !void {
-    const stdout = io.getStdOut().writer();
-    try stdout.print("Available commands\n", .{});
-    const commands = getCommands();
-    var it = commands.iterator();
+const CliCommand = struct {
+    name: []const u8,
+    description: []const u8,
+    callbackFn: *const fn (allocator: mem.Allocator) anyerror!void,
+};
 
-    while (it.next()) |entry| {
-        try stdout.print("{s}- {s}\n", .{ entry.key_ptr.*, entry.value_ptr.*.description });
+fn callbackHelp(allocator: mem.Allocator) !void {
+    var commands = try getCommands(allocator);
+    defer commands.deinit();
+
+    var it = commands.iterator();
+    while (it.next()) |pt| {
+        std.debug.print("{s}- {s}", .{ pt.key_ptr.*, pt.value_ptr.description });
     }
 }
 
-fn getCommands() std.StringHashMap(CliCommand) {
-    var commands = std.StringHashMap(CliCommand).init(heap.page_allocator);
-    commands.put("help", .{ .name = "help", .description = "List all available commands", .callbackFn = callbackHelp }) catch unreachable;
+fn getCommands(allocator: mem.Allocator) !std.StringHashMap(CliCommand) {
+    var commands = std.StringHashMap(CliCommand).init(allocator);
+    try commands.put("help", .{ .name = "help", .description = "List all the available commands", .callbackFn = callbackHelp });
 
     return commands;
 }
 
-fn cleanInput(allocator: mem.Allocator, str: []const u8) ![][]const u8 {
-    var words = std.ArrayList([]const u8).init(allocator);
+pub fn startRepl() !void {
+    var gpa = heap.GeneralPurposeAllocator(.{}){};
+    _ = gpa.deinit();
 
-    var iterator = mem.splitSequence(u8, str, " ");
-    while (iterator.next()) |word| {
-        if (word.len > 0) {
-            try words.append(try allocator.dupe(u8, word));
-        }
-    }
-
-    return words.toOwnedSlice();
-}
-
-pub fn starRepl() !void {
-    const stdout = io.getStdOut().writer();
-    const stdin = io.getStdIn().reader();
-
-    try stdout.print("{s}\n", .{trademarks});
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
+    const stdin = std.io.getStdIn().reader();
+    const stdout = std.io.getStdOut().writer();
 
     const allocator = gpa.allocator();
-    var commands = getCommands();
-    defer {
-        var it = commands.iterator();
-        while (it.next()) |key| {
-            allocator.free(key.key_ptr.*);
-        }
 
-        commands.deinit();
-    }
+    try stdout.print("{s}\n", .{trademarks});
+
+    var commands = try getCommands(allocator);
+    defer commands.deinit();
+    var buf: [120]u8 = undefined;
 
     while (true) {
         try stdout.print("costing> ", .{});
-        var input_buf: [120]u8 = undefined;
-        const input = try stdin.readUntilDelimiterOrEof(&input_buf, '\n');
 
-        if (input) |line| {
-            const cleaned = try cleanInput(allocator, line);
-            defer {
-                for (cleaned) |w_item| {
-                    allocator.free(w_item);
-                }
-
-                allocator.free(cleaned);
-            }
-
-            if (cleaned.len == 0) continue;
-            const command = cleaned[0];
-
-            if (commands.get(command)) |cli| {
-                cli.callbackFn() catch |err| {
-                    try stdout.print("Error: {}\n", .{err});
-                };
+        if (try stdin.readUntilDelimiterOrEof(&buf, '\n')) |word| {
+            const line = mem.trimRight(u8, word[0 .. word.len - 1], "\r");
+            if (commands.get(line)) |cli| {
+                try cli.callbackFn(allocator);
             } else {
-                try stdout.print("Invalid command\n", .{});
+                std.debug.print("Ivalid command\n", .{});
             }
         }
     }
