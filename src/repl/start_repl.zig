@@ -8,7 +8,7 @@ const heap = std.heap;
 pub const CliCommand = struct {
     name: []const u8,
     description: []const u8,
-    callbackFn: *const fn (commands: *std.StringHashMap(CliCommand)) void,
+    callbackFn: *const fn () anyerror!void,
 };
 
 const trademarks =
@@ -17,56 +17,81 @@ const trademarks =
     \\
 ;
 
-fn callbackHelp(commands: *std.StringHashMap(CliCommand)) void {
-    debug.print("\n", .{});
+fn callbackHelp() !void {
+    const stdout = io.getStdOut().writer();
+    try stdout.print("Available commands\n", .{});
+    const commands = getCommands();
+    var it = commands.iterator();
 
-    var keys = commands.keyIterator();
-    while (keys.next()) |key| {
-        debug.print("{s}- {s}\n", .{ key.*, commands.get(key.*).?.description });
+    while (it.next()) |entry| {
+        try stdout.print("{s}- {s}\n", .{ entry.key_ptr.*, entry.value_ptr.*.description });
     }
+}
+
+fn getCommands() std.StringHashMap(CliCommand) {
+    var commands = std.StringHashMap(CliCommand).init(heap.page_allocator);
+    commands.put("help", .{ .name = "help", .description = "List all available commands", .callbackFn = callbackHelp }) catch unreachable;
+
+    return commands;
 }
 
 fn cleanInput(allocator: mem.Allocator, str: []const u8) ![][]const u8 {
-    const lower = try ascii.allocLowerString(allocator, str);
-    defer allocator.free(lower);
-
     var words = std.ArrayList([]const u8).init(allocator);
-    defer words.deinit();
 
-    var iterator = mem.splitSequence(u8, lower, " ");
+    var iterator = mem.splitSequence(u8, str, " ");
     while (iterator.next()) |word| {
-        if (word.len > 0) try words.append(try allocator.dupe(u8, word));
+        if (word.len > 0) {
+            try words.append(try allocator.dupe(u8, word));
+        }
     }
 
-    return try words.toOwnedSlice();
+    return words.toOwnedSlice();
 }
 
 pub fn starRepl() !void {
-    debug.print("{s}", .{trademarks});
-    debug.print("", .{});
+    const stdout = io.getStdOut().writer();
+    const stdin = io.getStdIn().reader();
+
+    try stdout.print("{s}\n", .{trademarks});
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
 
     const allocator = gpa.allocator();
-    var commands = std.StringHashMap(CliCommand).init(allocator);
-    defer commands.deinit();
+    var commands = getCommands();
+    defer {
+        var it = commands.iterator();
+        while (it.next()) |key| {
+            allocator.free(key.key_ptr.*);
+        }
 
-    try commands.put("help", .{ .name = "help", .description = "List all available commands", .callbackFn = callbackHelp });
+        commands.deinit();
+    }
 
     while (true) {
-        debug.print("costing>", .{});
+        try stdout.print("costing> ", .{});
+        var input_buf: [120]u8 = undefined;
+        const input = try stdin.readUntilDelimiterOrEof(&input_buf, '\n');
 
-        const stdin = io.getStdIn().reader();
-        const bare_line = try stdin.readUntilDelimiterAlloc(allocator, '\n', 120);
-        defer allocator.free(bare_line);
+        if (input) |line| {
+            const cleaned = try cleanInput(allocator, line);
+            defer {
+                for (cleaned) |w_item| {
+                    allocator.free(w_item);
+                }
 
-        const commandSlice = try cleanInput(allocator, bare_line);
-        const command = commandSlice[0];
+                allocator.free(cleaned);
+            }
 
-        if (commands.get(command)) |cli| {
-            cli.callbackFn(&commands);
-        } else {
-            debug.print("Invalid command", .{});
+            if (cleaned.len == 0) continue;
+            const command = cleaned[0];
+
+            if (commands.get(command)) |cli| {
+                cli.callbackFn() catch |err| {
+                    try stdout.print("Error: {}\n", .{err});
+                };
+            } else {
+                try stdout.print("Invalid command\n", .{});
+            }
         }
     }
 }
