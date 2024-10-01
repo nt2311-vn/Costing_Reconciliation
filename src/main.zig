@@ -19,12 +19,12 @@ pub fn main() !void {
 
         if (try stdin.readUntilDelimiterOrEof(buf, '\n')) |line| {
             var input = line;
-            defer allocator.free(input);
 
             input = @constCast(mem.trimRight(u8, input, "\r\n"));
             if (input.len == 0) {
                 break;
             }
+            input = try allocator.dupe(u8, input);
 
             debug.print("{s} {d}\n", .{ input, input.len });
         } else {
