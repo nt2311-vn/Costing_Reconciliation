@@ -1,6 +1,8 @@
 const std = @import("std");
-const mem = @import("std").mem;
-const heap = @import("std").heap;
+const builtin = @import("builtin");
+const mem = std.mem;
+const heap = std.heap;
+const debug = std.debug;
 
 const trademarks: []const u8 =
     \\(c) Copyright nt2311-vn. All right reserved.
@@ -8,52 +10,36 @@ const trademarks: []const u8 =
     \\
 ;
 
-const CliCommand = struct {
+pub const CliCommand = struct {
     name: []const u8,
     description: []const u8,
-    callbackFn: *const fn (allocator: mem.Allocator) anyerror!void,
+    execFn: *const fn () anyerror!void,
 };
-
-fn callbackHelp(allocator: mem.Allocator) !void {
-    var commands = try getCommands(allocator);
-    defer commands.deinit();
-
-    var it = commands.iterator();
-    while (it.next()) |pt| {
-        std.debug.print("{s}- {s}", .{ pt.key_ptr.*, pt.value_ptr.description });
-    }
-}
-
-fn getCommands(allocator: mem.Allocator) !std.StringHashMap(CliCommand) {
-    var commands = std.StringHashMap(CliCommand).init(allocator);
-    try commands.put("help", .{ .name = "help", .description = "List all the available commands", .callbackFn = callbackHelp });
-
-    return commands;
-}
 
 pub fn startRepl() !void {
     var gpa = heap.GeneralPurposeAllocator(.{}){};
     _ = gpa.deinit();
 
+    // const allocator = gpa.allocator();
     const stdin = std.io.getStdIn().reader();
-    const allocator = gpa.allocator();
+    const stdout = std.io.getStdOut().writer();
 
-    std.debug.print("{s}\n", .{trademarks});
-
-    var commands = try getCommands(allocator);
-    defer commands.deinit();
-    var buf: [120]u8 = undefined;
+    try stdout.print("{s}\n", .{trademarks});
 
     while (true) {
-        std.debug.print("costing> ", .{});
-
-        if (try stdin.readUntilDelimiterOrEof(&buf, '\n')) |word| {
-            const line = mem.trimRight(u8, word[0 .. word.len - 1], "\r");
-            if (commands.get(line)) |cli| {
-                try cli.callbackFn(allocator);
-            } else {
-                std.debug.print("Invalid command\n", .{});
+        var buf: [120]u8 = undefined;
+        try stdout.print("costing> ", .{});
+        if (try stdin.readUntilDelimiterOrEof(&buf, '\n')) |line| {
+            var input = line;
+            if (builtin.os.tag == .windows) {
+                input = @constCast(mem.trimRight(u8, input, "\r"));
             }
+
+            if (input.len == 0) {
+                break;
+            }
+
+            debug.print("{s}\n", .{input});
         }
     }
 }
