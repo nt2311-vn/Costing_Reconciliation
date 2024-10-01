@@ -3,10 +3,8 @@
 .env
 
 # Ignore zig-out (generate in build process)
-./zig-out
-./.zig-out
+zig-out/
 
 # Ignore zig-cache
-./zig-cache
-./.zig-cache/
+.zig-cache/
 
