@@ -25,6 +25,34 @@ fn helpCommand() !void {
     }
 }
 
+fn startCommand() !void {
+    // const Item = struct {
+    //     code: []const u8,
+    //     quantity: u32,
+    // };
+
+    // const Line = struct {
+    //     date: []const u8,
+    //     items: []Item,
+    // };
+
+    const fs = std.fs;
+
+    var if_file = fs.cwd().openFile("../data/IF.csv", .{}) catch |err| {
+        debug.print("could not open file", .{});
+        return err;
+    };
+    defer if_file.close();
+
+    var buf_reader = std.io.bufferedReader(if_file.reader());
+    var in_stream = buf_reader.reader();
+    var buf: [1024]u8 = undefined;
+
+    while (try in_stream.readUntilDelimiterOrEof(&buf, '\n')) |line| {
+        debug.print("{s}\n", .{line});
+    }
+}
+
 pub fn startRepl() !void {
     var gpa = heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -35,6 +63,8 @@ pub fn startRepl() !void {
 
     try commands.put("help", .{ .name = "help", .description = "List all the available commands", .execFn = helpCommand });
 
+    try commands.put("start", .{ .name = "start", .description = "Start the reconcilation", .execFn = startCommand });
+
     debug.print("{s}\n", .{trademarks});
 
     while (true) {
@@ -42,17 +72,14 @@ pub fn startRepl() !void {
         defer allocator.free(buf);
         debug.print("Your input> ", .{});
         if (try stdin.readUntilDelimiterOrEof(buf, '\n')) |line| {
-            var input = try allocator.dupe(u8, line);
-            defer allocator.free(input);
+            const trim_input = mem.trimRight(u8, line, "\r\n");
 
-            input = @constCast(mem.trimRight(u8, input, "\r"));
+            if (trim_input.len == 0) continue;
 
-            if (input.len == 0) continue;
-
-            if (commands.get(input)) |command| {
+            if (commands.get(trim_input)) |command| {
                 try command.execFn();
             } else {
-                debug.print("Invalid commands\n", .{});
+                debug.print("Invalid commands: {s}\n", .{trim_input});
             }
         }
     }
