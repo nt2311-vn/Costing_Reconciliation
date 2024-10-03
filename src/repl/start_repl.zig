@@ -45,7 +45,7 @@ pub fn startRepl() !void {
             var input = try allocator.dupe(u8, line);
             defer allocator.free(input);
 
-            input = @constCast(mem.trimRight(u8, input, "\r\n"));
+            input = @constCast(mem.trimRight(u8, input, "\r"));
 
             if (input.len == 0) continue;
 
