@@ -29,9 +29,13 @@ pub fn startRepl() !void {
         const buf = try allocator.alloc(u8, 120);
         defer allocator.free(buf);
         try stdout.print("Your input> ", .{});
-        if (try stdin.readUntilDelimiterOrEof(&buf, '\n')) |line| {
-            
+        if (try stdin.readUntilDelimiterOrEof(buf, '\n')) |line| {
+            var input = try allocator.dupe(u8, line);
+            defer allocator.free(input);
 
-                   }
+            input = @constCast(mem.trimRight(u8, input, "\r\n"));
+
+            debug.print("{s} {d}\n", .{ input, input.len });
+        }
     }
 }
