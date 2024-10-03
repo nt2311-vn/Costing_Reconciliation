@@ -1,35 +1,8 @@
 const std = @import("std");
-const mem = std.mem;
-const heap = std.heap;
-const debug = std.debug;
+const repl = @import("./repl/start_repl.zig");
 
 pub fn main() !void {
-    var gpa = heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-
-    const allocator = gpa.allocator();
-    const stdin = std.io.getStdIn().reader();
-    const stdout = std.io.getStdOut().writer();
-
-    while (true) {
-        try stdout.print("Your input> ", .{});
-        const buf = try allocator.alloc(u8, 120);
-        defer allocator.free(buf);
-
-        if (try stdin.readUntilDelimiterOrEof(buf, '\n')) |line| {
-            var input = line;
-
-            input = @constCast(mem.trimRight(u8, input, "\r\n"));
-            if (input.len == 0) {
-                break;
-            }
-            input = try allocator.dupe(u8, input);
-
-            debug.print("{s} {d}\n", .{ input, input.len });
-        } else {
-            unreachable;
-        }
-    }
+    try repl.startRepl();
 }
 
 test "simple test" {
