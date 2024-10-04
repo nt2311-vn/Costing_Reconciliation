@@ -95,6 +95,7 @@ pub fn startRepl() !void {
     try commands.put("help", .{ .name = "help", .description = "List all the available commands", .execFn = helpCommand });
 
     try commands.put("start", .{ .name = "start", .description = "Start the reconcilation", .execFn = startCommand });
+
     try commands.put("exit", .{ .name = "exit", .description = "Exit the application", .execFn = exitCommand });
 
     debug.print("{s}\n", .{trademarks});

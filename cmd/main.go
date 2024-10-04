@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -22,7 +23,7 @@ func main() {
 	startTime := time.Now().Unix()
 
 	for _, line := range lines {
-		fmt.Println(line)
+		fmt.Println(strings.Join(line, ","))
 	}
 
 	endTime := time.Now().Unix()
