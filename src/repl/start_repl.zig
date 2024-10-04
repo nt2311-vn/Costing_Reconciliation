@@ -62,6 +62,7 @@ fn startCommand() !void {
             else => return err,
         };
 
+        debug.print("{s}\n", .{line});
     }
 
     debug.print("Reading complete:\n", .{});
