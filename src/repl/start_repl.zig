@@ -13,10 +13,14 @@ const trademarks: []const u8 =
 fn helpCommand() !void {
     const Command = struct { name: []const u8, description: []const u8 };
 
-    const commands: [2]Command = [_]Command{ Command{ .name = "help", .description = "List all available commands" }, Command{ .name = "start", .description = "Start the programming" } };
+    const commands: [3]Command = [_]Command{
+        Command{ .name = "help", .description = "List all available commands" },
+        Command{ .name = "start", .description = "Start the programming" },
+        Command{ .name = "exit", .description = "Exit the application" },
+    };
 
     for (commands) |command| {
-        debug.print("{s} - {s}\n", .{ command.name, command.description });
+        debug.print("{s}- {s}\n", .{ command.name, command.description });
     }
 }
 
