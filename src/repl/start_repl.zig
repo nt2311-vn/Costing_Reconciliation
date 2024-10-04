@@ -25,15 +25,10 @@ fn helpCommand() !void {
 }
 
 fn startCommand() !void {
-    // const Item = struct {
-    //     code: []const u8,
-    //     quantity: u32,
-    // };
-
-    // const Line = struct {
-    //     date: []const u8,
-    //     items: []Item,
-    // };
+    const Item = struct {
+        code: []const u8,
+        quantity: u32,
+    };
 
     var gpa = heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -51,26 +46,25 @@ fn startCommand() !void {
     var buf_reader = std.io.bufferedReader(if_file.reader());
     var reader = buf_reader.reader();
 
-    var arr = std.ArrayList(u8).init(allocator);
-    defer arr.deinit();
+    // var arr = std.ArrayList(u8).init(allocator);
+    // defer arr.deinit();
 
-    const time_start = time.timestamp();
+    var reconcile_map = std.StringHashMap(Item).init(allocator);
+    defer reconcile_map.deinit();
+
+    const buf = try allocator.alloc(u8, 100);
+    defer allocator.free(buf);
 
     while (true) {
-        reader.streamUntilDelimiter(arr.writer(), '\n', null) catch |err| switch (err) {
+        const line = reader.readUntilDelimiter(buf, '\n') catch |err| switch (err) {
             error.StreamTooLong => break,
             error.EndOfStream => break,
             else => return err,
         };
 
-        const line = arr.items;
-        debug.print("{s}\n", .{line});
-        arr.clearRetainingCapacity();
     }
 
-    const time_end = time.timestamp();
-
-    debug.print("Reading complete: Took {d} seconds\n", .{time_end - time_start});
+    debug.print("Reading complete:\n", .{});
 }
 
 fn exitCommand() !void {
