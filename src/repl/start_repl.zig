@@ -67,14 +67,11 @@ fn startCommand() !void {
             if (i < substr.len) {
                 substr[i] = data;
                 i += 1;
-                debug.print("{s}\n", .{data});
             } else {
                 break;
             }
         }
     }
-
-    debug.print("Reading complete:\n", .{});
 }
 
 fn exitCommand() !void {
