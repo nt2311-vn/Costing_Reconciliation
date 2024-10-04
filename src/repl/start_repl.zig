@@ -46,9 +46,6 @@ fn startCommand() !void {
     var buf_reader = std.io.bufferedReader(if_file.reader());
     var reader = buf_reader.reader();
 
-    // var arr = std.ArrayList(u8).init(allocator);
-    // defer arr.deinit();
-
     var reconcile_map = std.StringHashMap(Item).init(allocator);
     defer reconcile_map.deinit();
 
@@ -62,7 +59,19 @@ fn startCommand() !void {
             else => return err,
         };
 
-        debug.print("{s}\n", .{line});
+        var substr: [6][]const u8 = undefined;
+        var it = mem.splitSequence(u8, line, ",");
+
+        var i: usize = 0;
+        while (it.next()) |data| {
+            if (i < substr.len) {
+                substr[i] = data;
+                i += 1;
+                debug.print("{s}\n", .{data});
+            } else {
+                break;
+            }
+        }
     }
 
     debug.print("Reading complete:\n", .{});
