@@ -36,21 +36,38 @@ fn startCommand() !void {
     //     items: []Item,
     // };
 
+    var gpa = heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+
+    const allocator = gpa.allocator();
+
     const fs = std.fs;
 
-    var if_file = fs.cwd().openFile("../data/IF.csv", .{}) catch |err| {
-        debug.print("could not open file", .{});
+    var if_file = fs.cwd().openFile("src/data/IF.csv", .{ .mode = .read_only }) catch |err| {
+        debug.print("could not open file\n", .{});
         return err;
     };
     defer if_file.close();
 
     var buf_reader = std.io.bufferedReader(if_file.reader());
-    var in_stream = buf_reader.reader();
-    var buf: [1024]u8 = undefined;
+    var reader = buf_reader.reader();
 
-    while (try in_stream.readUntilDelimiterOrEof(&buf, '\n')) |line| {
+    var arr = std.ArrayList(u8).init(allocator);
+    defer arr.deinit();
+
+    while (true) {
+        reader.streamUntilDelimiter(arr.writer(), '\n', null) catch |err| switch (err) {
+            error.StreamTooLong => break,
+            error.EndOfStream => break,
+            else => return err,
+        };
+
+        const line = arr.items;
         debug.print("{s}\n", .{line});
+        arr.clearRetainingCapacity();
     }
+
+    debug.print("reading complete\n", .{});
 }
 
 pub fn startRepl() !void {
@@ -60,6 +77,7 @@ pub fn startRepl() !void {
     const allocator = gpa.allocator();
     const stdin = std.io.getStdIn().reader();
     var commands = std.StringHashMap(CliCommand).init(allocator);
+    defer commands.deinit();
 
     try commands.put("help", .{ .name = "help", .description = "List all the available commands", .execFn = helpCommand });
 
@@ -73,6 +91,7 @@ pub fn startRepl() !void {
         debug.print("Your input> ", .{});
         if (try stdin.readUntilDelimiterOrEof(buf, '\n')) |line| {
             const trim_input = mem.trimRight(u8, line, "\r\n");
+            if (mem.eql(u8, trim_input, "exit")) break;
 
             if (trim_input.len == 0) continue;
 
