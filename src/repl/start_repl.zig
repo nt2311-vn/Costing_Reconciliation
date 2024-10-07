@@ -66,26 +66,11 @@ fn startCommand() !void {
         while (it.next()) |data| {
             if (i < substr.len) {
                 substr[i] = data;
+                debug.print("{s}\n", .{substr[i]});
                 i += 1;
             } else {
                 break;
             }
-        }
-
-        const key_str = try std.fmt.allocPrint(allocator, "{s}_{s}", .{ substr[4], substr[3] });
-        defer allocator.free(key_str);
-
-        const key_val = reconcile_map.getOrPut(key_str) catch |err| {
-            debug.print("caugh error: {s}", .{@errorName(err)});
-            return err;
-        };
-
-        if (key_val.found_existing) {
-            key_val.value_ptr.quantity += 1;
-        } else {
-            key_val.key_ptr.* = key_str;
-            key_val.value_ptr.quantity = 1;
-            key_val.value_ptr.code = substr[3];
         }
     }
 }
