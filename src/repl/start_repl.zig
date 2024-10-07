@@ -72,17 +72,26 @@ fn startCommand() !void {
             }
         }
 
-        const key_len = substr[4].len + substr[3].len + 1;
+        const key_part1 = try allocator.dupe(u8, substr[4]);
+        const key_part2 = try allocator.dupe(u8, substr[3]);
+        defer allocator.free(key_part1);
+        defer allocator.free(key_part2);
+
+        const key_len = key_part1.len + key_part2.len + 1;
         const key = try allocator.alloc(u8, key_len);
         defer allocator.free(key);
 
-        _ = try std.fmt.bufPrint(key, "{s}_{s}", .{ substr[4], substr[3] });
+        _ = try std.fmt.bufPrint(key, "{s}_{s}", .{ key_part1, key_part2 });
 
-        var key_val = try reconcile_map.getOrPut(key);
+        debug.print("capacity: {}\n", .{reconcile_map.capacity()});
+
+        var key_val = reconcile_map.getOrPutAssumeCapacity(key);
+
         if (key_val.found_existing) {
             key_val.value_ptr.quantity += 1;
         } else {
-            key_val.value_ptr.* = Item{ .code = substr[3], .quantity = 1 };
+            key_val.value_ptr.code = key_part2;
+            key_val.value_ptr.quantity = 1;
         }
     }
 }
