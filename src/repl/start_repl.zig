@@ -71,6 +71,28 @@ fn startCommand() !void {
                 break;
             }
         }
+
+        const key_str = try std.fmt.allocPrint(allocator, "{s}_{s}", .{ substr[4], substr[3] });
+        defer allocator.free(key_str);
+
+        const quantity = @as(u32, @intCast(substr[5][0] - '0'));
+        if (reconcile_map.getPtr(key_str)) |i_ptr| {
+            i_ptr.quantity += quantity;
+        } else {
+            const dup_key = try allocator.dupe(u8, key_str);
+            defer allocator.free(dup_key);
+
+            const dup_code = try allocator.dupe(u8, substr[3]);
+            errdefer allocator.free(dup_code);
+
+            try reconcile_map.put(dup_key, .{ .code = dup_code, .quantity = quantity });
+        }
+    }
+
+    var map_it = reconcile_map.iterator();
+
+    while (map_it.next()) |p| {
+        debug.print("{s}:{d}\n", .{ p.key_ptr.*, p.value_ptr.*.quantity });
     }
 }
 
