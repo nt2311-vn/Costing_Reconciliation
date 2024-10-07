@@ -66,11 +66,23 @@ fn startCommand() !void {
         while (it.next()) |data| {
             if (i < substr.len) {
                 substr[i] = data;
-                debug.print("{s}\n", .{substr[i]});
                 i += 1;
             } else {
                 break;
             }
+        }
+
+        const key_len = substr[4].len + substr[3].len + 1;
+        const key = try allocator.alloc(u8, key_len);
+        defer allocator.free(key);
+
+        _ = try std.fmt.bufPrint(key, "{s}_{s}", .{ substr[4], substr[3] });
+
+        var key_val = try reconcile_map.getOrPut(key);
+        if (key_val.found_existing) {
+            key_val.value_ptr.quantity += 1;
+        } else {
+            key_val.value_ptr.* = Item{ .code = substr[3], .quantity = 1 };
         }
     }
 }
