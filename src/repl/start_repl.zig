@@ -73,14 +73,7 @@ fn loadIF(alloc: mem.Allocator, f: *fs.File) anyerror!std.StringHashMap(Item) {
             return err;
         };
 
-        if (reconcile_map.getPtr(key)) |k_pointer| {
-            k_pointer.quantity += 1;
-        } else {
-            reconcile_map.put(key, .{ .code = key_part2, .quantity = 1 }) catch |err| {
-                debug.print("Error occurs: {s}\n", .{@errorName(err)});
-                return err;
-            };
-        }
+        debug.print("{s}\n", .{key});
     }
 
     return reconcile_map;
@@ -98,7 +91,7 @@ fn startCommand() !void {
     };
     defer if_file.close();
 
-    const map = try loadIF(allocator, &if_file);
+    var map = try loadIF(allocator, &if_file);
     var it = map.iterator();
 
     while (it.next()) |p| {
@@ -139,10 +132,8 @@ pub fn startRepl() !void {
         debug.print("Your input> ", .{});
         if (try stdin.readUntilDelimiterOrEof(buf, '\n')) |line| {
             const trim_input = mem.trimRight(u8, line, "\r\n");
-            defer allocator.free(trim_input);
 
             if (trim_input.len == 0) continue;
-
             if (commands.get(trim_input)) |command| {
                 command.execFn() catch |err| {
                     debug.print("Error on execution function: {s}\n", .{@errorName(err)});
