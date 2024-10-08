@@ -81,17 +81,18 @@ fn startCommand() !void {
         const key = try allocator.alloc(u8, key_len);
         defer allocator.free(key);
 
-        _ = try std.fmt.bufPrint(key, "{s}_{s}", .{ key_part1, key_part2 });
+        _ = std.fmt.bufPrint(key, "{s}_{s}", .{ key_part1, key_part2 }) catch |err| {
+            debug.print("Error occurs: {s}\n", .{@errorName(err)});
+            return err;
+        };
 
-        debug.print("capacity: {}\n", .{reconcile_map.capacity()});
-
-        var key_val = reconcile_map.getOrPutAssumeCapacity(key);
-
-        if (key_val.found_existing) {
-            key_val.value_ptr.quantity += 1;
+        if (reconcile_map.getPtr(key)) |k_pointer| {
+            k_pointer.quantity += 1;
         } else {
-            key_val.value_ptr.code = key_part2;
-            key_val.value_ptr.quantity = 1;
+            reconcile_map.put(key, .{ .code = key_part2, .quantity = 1 }) catch |err| {
+                debug.print("Error occurs: {s}\n", .{@errorName(err)});
+                return err;
+            };
         }
     }
 }
@@ -129,14 +130,20 @@ pub fn startRepl() !void {
         debug.print("Your input> ", .{});
         if (try stdin.readUntilDelimiterOrEof(buf, '\n')) |line| {
             const trim_input = mem.trimRight(u8, line, "\r\n");
+            defer allocator.free(trim_input);
 
             if (trim_input.len == 0) continue;
 
             if (commands.get(trim_input)) |command| {
-                try command.execFn();
+                command.execFn() catch |err| {
+                    debug.print("Error on execution function: {s}\n", .{@errorName(err)});
+                    return err;
+                };
             } else {
                 debug.print("Invalid commands: {s}\n", .{trim_input});
             }
+        } else {
+            debug.print("Error read stream occur\n", .{});
         }
     }
 }
