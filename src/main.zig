@@ -1,8 +1,15 @@
 const std = @import("std");
+const mem = std.mem;
+const heap = std.heap;
 const repl = @import("./repl/start_repl.zig");
 
 pub fn main() !void {
-    try repl.startRepl();
+    var gpa = heap.GeneralPurposeAllocator(.{}){};
+
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    try repl.startRepl(allocator);
 }
 
 test "simple test" {
