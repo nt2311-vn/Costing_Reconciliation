@@ -15,8 +15,7 @@ const Item = struct {
     quantity: u32,
 };
 
-fn helpCommand(alloc: mem.Allocator) !void {
-    _ = alloc;
+fn helpCommand() !void {
     const Command = struct { name: []const u8, description: []const u8 };
 
     const commands: [3]Command = [_]Command{
@@ -89,7 +88,12 @@ fn loadIF(alloc: mem.Allocator, f: *fs.File) anyerror!std.StringHashMap(Item) {
     return reconcile_map;
 }
 
-fn startCommand(allocator: mem.Allocator) !void {
+fn startCommand() !void {
+    var gpa = heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+
+    const allocator = gpa.allocator();
+
     var if_file = fs.cwd().openFile("src/data/IF.csv", .{ .mode = .read_only }) catch |err| {
         debug.print("could not open file\n", .{});
         return err;
@@ -108,15 +112,19 @@ fn exitCommand() !void {
     std.process.exit(0);
 }
 
-pub fn startRepl(alloc: mem.Allocator) !void {
+pub fn startRepl() !void {
+    var gpa = heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+
     const CliCommand = struct {
         name: []const u8,
         description: []const u8,
-        execFn: *const fn (alloc: mem.Allocator) anyerror!void,
+        execFn: *const fn () anyerror!void,
     };
 
+    const allocator = gpa.allocator();
     const stdin = std.io.getStdIn().reader();
-    var commands = std.StringHashMap(CliCommand).init(alloc);
+    var commands = std.StringHashMap(CliCommand).init(allocator);
     defer commands.deinit();
 
     try commands.put("help", .{ .name = "help", .description = "List all the available commands", .execFn = helpCommand });
@@ -128,15 +136,15 @@ pub fn startRepl(alloc: mem.Allocator) !void {
     debug.print("{s}\n", .{trademarks});
 
     while (true) {
-        const buf = try alloc.alloc(u8, 120);
-        defer alloc.free(buf);
+        const buf = try allocator.alloc(u8, 120);
+        defer allocator.free(buf);
         debug.print("Your input> ", .{});
         if (try stdin.readUntilDelimiterOrEof(buf, '\n')) |line| {
             const trim_input = mem.trimRight(u8, line, "\r\n");
 
             if (trim_input.len == 0) continue;
             if (commands.get(trim_input)) |command| {
-                command.execFn(alloc) catch |err| {
+                command.execFn() catch |err| {
                     debug.print("Error on execution function: {s}\n", .{@errorName(err)});
                     return err;
                 };
