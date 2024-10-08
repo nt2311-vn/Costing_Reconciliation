@@ -2,13 +2,18 @@ const std = @import("std");
 const mem = std.mem;
 const heap = std.heap;
 const debug = std.debug;
-const time = std.time;
+const fs = std.fs;
 
 const trademarks: []const u8 =
     \\(c) Copyright nt2311-vn. All right reserved.
     \\Welcome to costing recoliation cli written in Zig.
     \\
 ;
+
+const Item = struct {
+    code: []const u8,
+    quantity: u32,
+};
 
 fn helpCommand() !void {
     const Command = struct { name: []const u8, description: []const u8 };
@@ -24,33 +29,15 @@ fn helpCommand() !void {
     }
 }
 
-fn startCommand() !void {
-    const Item = struct {
-        code: []const u8,
-        quantity: u32,
-    };
-
-    var gpa = heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-
-    const allocator = gpa.allocator();
-
-    const fs = std.fs;
-
-    var if_file = fs.cwd().openFile("src/data/IF.csv", .{ .mode = .read_only }) catch |err| {
-        debug.print("could not open file\n", .{});
-        return err;
-    };
-    defer if_file.close();
-
-    var buf_reader = std.io.bufferedReader(if_file.reader());
-    var reader = buf_reader.reader();
-
-    var reconcile_map = std.StringHashMap(Item).init(allocator);
+fn loadIF(alloc: mem.Allocator, f: *fs.File) anyerror!std.StringHashMap(Item) {
+    var reconcile_map = std.StringHashMap(Item).init(alloc);
     defer reconcile_map.deinit();
 
-    const buf = try allocator.alloc(u8, 100);
-    defer allocator.free(buf);
+    var buf_reader = std.io.bufferedReader(f.reader());
+    var reader = buf_reader.reader();
+
+    const buf = try alloc.alloc(u8, 100);
+    defer alloc.free(buf);
 
     while (true) {
         const line = reader.readUntilDelimiter(buf, '\n') catch |err| switch (err) {
@@ -61,8 +48,8 @@ fn startCommand() !void {
 
         var substr: [6][]const u8 = undefined;
         var it = mem.splitSequence(u8, line, ",");
-
         var i: usize = 0;
+
         while (it.next()) |data| {
             if (i < substr.len) {
                 substr[i] = data;
@@ -72,14 +59,14 @@ fn startCommand() !void {
             }
         }
 
-        const key_part1 = try allocator.dupe(u8, substr[4]);
-        const key_part2 = try allocator.dupe(u8, substr[3]);
-        defer allocator.free(key_part1);
-        defer allocator.free(key_part2);
+        const key_part1 = try alloc.dupe(u8, substr[4]);
+        const key_part2 = try alloc.dupe(u8, substr[3]);
+        defer alloc.free(key_part1);
+        defer alloc.free(key_part2);
 
         const key_len = key_part1.len + key_part2.len + 1;
-        const key = try allocator.alloc(u8, key_len);
-        defer allocator.free(key);
+        const key = try alloc.alloc(u8, key_len);
+        defer alloc.free(key);
 
         _ = std.fmt.bufPrint(key, "{s}_{s}", .{ key_part1, key_part2 }) catch |err| {
             debug.print("Error occurs: {s}\n", .{@errorName(err)});
@@ -94,6 +81,28 @@ fn startCommand() !void {
                 return err;
             };
         }
+    }
+
+    return reconcile_map;
+}
+
+fn startCommand() !void {
+    var gpa = heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+
+    const allocator = gpa.allocator();
+
+    var if_file = fs.cwd().openFile("src/data/IF.csv", .{ .mode = .read_only }) catch |err| {
+        debug.print("could not open file\n", .{});
+        return err;
+    };
+    defer if_file.close();
+
+    const map = try loadIF(allocator, &if_file);
+    var it = map.iterator();
+
+    while (it.next()) |p| {
+        debug.print("{s}:{s} {d}\n", .{ p.key_ptr.*, p.value_ptr.*.code, p.value_ptr.*.quantity });
     }
 }
 
