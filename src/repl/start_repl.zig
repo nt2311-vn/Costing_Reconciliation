@@ -73,7 +73,16 @@ fn loadIF(alloc: mem.Allocator, f: *fs.File) anyerror!std.StringHashMap(Item) {
             return err;
         };
 
-        debug.print("{s}\n", .{key});
+        var rs = reconcile_map.getOrPut(key) catch |err| {
+            debug.print("Get error on get or put:{s}\n", .{@errorName(err)});
+            return err;
+        };
+
+        if (rs.found_existing) {
+            rs.value_ptr.quantity += 1;
+        } else {
+            rs.value_ptr.* = .{ .code = key_part2, .quantity = 1 };
+        }
     }
 
     return reconcile_map;
