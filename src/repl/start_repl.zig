@@ -36,55 +36,48 @@ fn loadIF(alloc: mem.Allocator, f: *fs.File) anyerror!std.StringHashMap(Item) {
     var buf_reader = std.io.bufferedReader(f.reader());
     var reader = buf_reader.reader();
 
-    const buf = try alloc.alloc(u8, 100);
-    defer alloc.free(buf);
+    var buf = std.ArrayList(u8).init(alloc);
+    defer buf.deinit();
 
+    var line_count: usize = 0;
     while (true) {
-        const line = reader.readUntilDelimiter(buf, '\n') catch |err| switch (err) {
-            error.StreamTooLong => break,
+        line_count += 1;
+        buf.clearRetainingCapacity();
+        reader.readUntilDelimiterArrayList(&buf, '\n', 1024) catch |err| switch (err) {
             error.EndOfStream => break,
             else => return err,
         };
 
-        var substr: [6][]const u8 = undefined;
-        var it = mem.splitSequence(u8, line, ",");
-        var i: usize = 0;
+        var substr = std.ArrayList([]const u8).init(alloc);
+        defer substr.deinit();
 
+        var it = mem.split(u8, buf.items, ",");
         while (it.next()) |data| {
-            if (i < substr.len) {
-                substr[i] = data;
-                i += 1;
-            } else {
-                break;
-            }
+            try substr.append(data);
         }
 
-        const key_part1 = try alloc.dupe(u8, substr[4]);
-        const key_part2 = try alloc.dupe(u8, substr[3]);
-        defer alloc.free(key_part1);
-        defer alloc.free(key_part2);
+        if (substr.items.len < 5) {
+            debug.print("Skipping invalid line {d}: not enough fields\n", .{line_count});
+            continue;
+        }
 
-        const key_len = key_part1.len + key_part2.len + 1;
-        const key = try alloc.alloc(u8, key_len);
-        defer alloc.free(key);
+        const key_part1 = substr.items[4];
+        const key_part2 = substr.items[3];
 
-        _ = std.fmt.bufPrint(key, "{s}_{s}", .{ key_part1, key_part2 }) catch |err| {
-            debug.print("Error occurs: {s}\n", .{@errorName(err)});
-            return err;
-        };
+        var key_buf = std.ArrayList(u8).init(alloc);
+        defer key_buf.deinit();
 
-        var rs = reconcile_map.getOrPut(key) catch |err| {
-            debug.print("Get error on get or put:{s}\n", .{@errorName(err)});
-            return err;
-        };
+        try std.fmt.format(key_buf.writer(), "{s}_{s}", .{ key_part1, key_part2 });
 
-        if (rs.found_existing) {
-            rs.value_ptr.quantity += 1;
+        var entry = try reconcile_map.getOrPut(try alloc.dupe(u8, key_buf.items));
+        if (entry.found_existing) {
+            entry.value_ptr.quantity += 1;
         } else {
-            rs.value_ptr.* = .{ .code = key_part2, .quantity = 1 };
+            entry.value_ptr.* = Item{ .code = try alloc.dupe(u8, key_part2), .quantity = 1 };
         }
     }
 
+    debug.print("Processed {d} lines, map size: {d}\n", .{ line_count, reconcile_map.count() });
     return reconcile_map;
 }
 
@@ -94,18 +87,31 @@ fn startCommand() !void {
 
     const allocator = gpa.allocator();
 
-    var if_file = fs.cwd().openFile("src/data/IF.csv", .{ .mode = .read_only }) catch |err| {
-        debug.print("could not open file\n", .{});
-        return err;
-    };
+    var if_file = try fs.cwd().openFile("src/data/IF.csv", .{ .mode = .read_only });
     defer if_file.close();
 
     var map = try loadIF(allocator, &if_file);
-    var it = map.iterator();
-
-    while (it.next()) |p| {
-        debug.print("{s}:{s} {d}\n", .{ p.key_ptr.*, p.value_ptr.*.code, p.value_ptr.*.quantity });
+    defer {
+        var it = map.iterator();
+        while (it.next()) |entry| {
+            allocator.free(entry.key_ptr.*);
+            allocator.free(entry.value_ptr.code);
+        }
+        map.deinit();
     }
+
+    debug.print("Map loaded, size: {d}\n", .{map.count()});
+
+    var it = map.iterator();
+    var count: usize = 0;
+    while (it.next()) |entry| : (count += 1) {
+        if (count % 100 == 0) {
+            debug.print("Processed {d} entries\n", .{count});
+        }
+        debug.print("{s}: {s} {d}\n", .{ entry.key_ptr.*, entry.value_ptr.code, entry.value_ptr.quantity });
+    }
+
+    debug.print("Finished processing {d} entries\n", .{count});
 }
 
 fn exitCommand() !void {
